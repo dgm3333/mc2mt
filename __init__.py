@@ -102,11 +102,12 @@ bl_region_type = "WINDOW"
 
 #TODO: Make this much more intuitive for the user!
 #Would be better if could define min[x,y,z] and max[x,y,z] and load between these point
+# this would mean an edit in mineregion.py approx line 844:     for z in range(pZ-loadRadius, pZ+loadRadius):
 mcLoadAtCursor = False  #Loads as if 3D cursor offset in viewport was the player (load) position.
 mcLowLimit = 60         #The lowest depth layer to load. (High=256, Sea=64, Low=0)
 mcHighLimit = 128       #The highest layer to load. (High=256, Sea=64, Low=0)
 
-mcLoadRadius = 10        # 'Load Radius - The half-width of the load range around load-pos.
+mcLoadRadius = 100        # 'Load Radius - The half-width of the load range around load-pos.
                         #                e.g, 4 will load 9x9 chunks around the load centre
                         #                WARNING! Above 10, this gets slow and eats LOTS of memory!
 mcOmitStone = False          # When True, do not import common blocks such as stone & dirt blocks (overworld) or netherrack (nether).

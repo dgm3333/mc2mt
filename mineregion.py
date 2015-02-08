@@ -27,8 +27,8 @@
 # what's a good way to swap out the world-choice dialogue for a custom path input??
 
 #"Surface only": use the heightmap and only load surface.
-#Load more than just the top level, obviously, cos of cliff 
-#walls, caves, etc. water should count as transparent for this process, 
+#Load more than just the top level, obviously, cos of cliff
+#walls, caves, etc. water should count as transparent for this process,
 #as should glass, flowers, torches, portal; all nonsolid block types.
 
 #"Load horizon" / "load radius": should be circular, or have options
@@ -39,6 +39,7 @@
 import numpy as npy
 #import blockbuild
 import sysutil
+import blockconversion
 #using blockbuild.createMCBlock(mcname, diffuseColour, mcfaceindices)
 #faceindices order: (bottom, top, right, front, left, back)
 #NB: this should probably change, as it was started by some uv errors.
@@ -60,8 +61,8 @@ totalchunks = 0
 wseed = None	#store chosen world's worldseed, handy for slimechunk calcs.
 
 MCREGION_VERSION_ID = 0x4abc;	# Check world's level.dat 'version' property for these.
-ANVIL_VERSION_ID = 0x4abd;		# 
-    
+ANVIL_VERSION_ID = 0x4abd;		#
+
 #TODO: Retrieve these from bpy.props properties stuck in the scene RNA.
 EXCLUDED_BLOCKS = [1, 3, 87]    #(1,3,87) # hack to reduce loading / slowdown: (1- Stone, 3- Dirt, 87 netherrack). Other usual suspects are Grass,Water, Leaves, Sand,StaticLava
 
@@ -259,7 +260,7 @@ BLOCKVARIANTS = {
                       ['Jungle',(89,70,27), [450,450,449,449,449,449]],
                     ],
                 #TODO: adjust leaf types, too!
-                
+
                 24: [ [''],#normal 'cracked' sandstone
                       ['Decor', (215,209,153), [403,403,301,301,301,301]],
                       ['Smooth',(215,209,153), [403,403,371,371,371,371]],
@@ -299,7 +300,7 @@ BLOCKVARIANTS = {
                       ['StnBrk', (100,100,100), [85]*6],
                       [''],
                     ],
-                
+
                 #slabs
                 44: [ [''], #stone slabs (default)
                       ['SndStn', (215,209,153), [192]*6],
@@ -309,7 +310,7 @@ BLOCKVARIANTS = {
                       ['StnBrk', (100,100,100), [54]*6],
                       [''],
                     ],
-                    
+
                 50: [ [''], #nowt on 0...
                       ['Ea'],	#None for colour, none Tex, then: CUSTOM MESH
                       ['We'],
@@ -317,7 +318,7 @@ BLOCKVARIANTS = {
                       ['Nr'],
                       ['Up']
                     ],
-                    
+
                 59: [ ['0', (160,184,0), [88]*6],   #?
                       ['1', (160,184,0), [89]*6],
                       ['2', (160,184,0), [90]*6],
@@ -345,7 +346,7 @@ BLOCKVARIANTS = {
                       ['Red', (188,51,46), [325]*6],
                       ['Black', (28,23,23), [264]*6]
                       ],
-                
+
                 #stone brick moss/crack/circle variants:
                 98: [ [''],
                       ['Mossy',  (100,100,100), [181]*6],
@@ -438,7 +439,7 @@ def readRegion(fname, vertexBuffer):
 
         offset = unpack(">i", b'\x00'+cheadr[0:3])[0]
         chunksectorcount = cheadr[3]    #last of the 4 bytes is the size (in 4k sectors) of the chunk
-        
+
         chunksLoaded = 0
         if offset != 0 and chunksectorcount != 0:    #chunks not generated as those coordinates yet will be blank!
             chunkdata = readChunk(rfile, offset, chunksectorcount)    #TODO Make sure you seek back to where you were to start with ...
@@ -464,31 +465,21 @@ def toChunkPos(pX,pZ):
 #         me.from_pydata(meshBuffer[meshname], [], [])
 #         me.update()
 
-def mcToMTCoord(chunkPos, blockPos):
-    """Converts a Minecraft chunk X,Z pair and a Minecraft ordered X,Y,Z block
-    Just remember: in Minecraft, Y points to the sky."""
-    # In Minecraft, +Z (west) <--- 0 ----> -Z (east), while North is -X and South is +X
-
-    vx = -(chunkPos[1] << 4) - blockPos[2]
-    vy = -(chunkPos[0] << 4) - blockPos[0]   # -x of chunkpos and -x of blockPos (x,y,z)
-    vz = blockPos[1]    #Minecraft's Y.
-    
-    return [vx,vy,vz]
 
 # def mcToBlendCoord(chunkPos, blockPos):
 #     """Converts a Minecraft chunk X,Z pair and a Minecraft ordered X,Y,Z block
 # location triple into a Blender coordinate vector Vx,Vy,Vz.
 # Just remember: in Minecraft, Y points to the sky."""
-# 
+#
 #     # Mapping Minecraft coords -> Blender coords
 #     # In Minecraft, +Z (west) <--- 0 ----> -Z (east), while North is -X and South is +X
 #     # In Blender, north is +Y, south is-Y, west is -X and east is +X.
 #     # So negate Z and map it as X, and negate X and map it as Y. It's slightly odd!
-# 
+#
 #     vx = -(chunkPos[1] << 4) - blockPos[2]
 #     vy = -(chunkPos[0] << 4) - blockPos[0]   # -x of chunkpos and -x of blockPos (x,y,z)
 #     vz = blockPos[1]    #Minecraft's Y.
-#     
+#
 #     return Vector((vx,vy,vz))
 
 
@@ -499,46 +490,46 @@ def mcToMTCoord(chunkPos, blockPos):
 # This also ensures material and name are set."""
 #     import blockbuild
 #     global OPTIONS  #, BLOCKDATA (surely!?)
-# 
+#
 #     bdat = BLOCKDATA[blockID]
-# 
+#
 #     corename = bdat[0]    # eg mcStone, mcTorch
-# 
+#
 #     if len(bdat) > 1:
 #         colourtriple = bdat[1]
 #     else:
 #         colourtriple = [214,127,255] #shocking pink
-# 
+#
 #     mcfaceindices = None    #[]
 #     if len(bdat) > 2 and bdat[2] is not None:
 #         mcfaceindices = bdat[2]
-# 
+#
 #     usesExtraBits = False
 #     if len(bdat) > 3:
 #         usesExtraBits = (bdat[3] == 'XD')
-# 
+#
 #     if not usesExtraBits:	#quick early create...
 #         landmeshname = "".join(["mc", corename])
 #         if landmeshname in bpy.data.meshes:
 #             return bpy.data.meshes[landmeshname]
 #         else:
 #             extraBits = None
-# 
+#
 #     objectShape = "box"	#but this can change based on extra data too...
 #     if len(bdat) > 4:
 #         objectShape = bdat[4]
-# 
+#
 #     shapeParams = None
 #     if len(bdat) > 5:   #and objectShape = 'insets'
 #         shapeParams = bdat[5]
-#     
+#
 #     cycParams = None
 #     if OPTIONS['usecycles']:
 #         if len(bdat) > 6:
 #             cycParams = bdat[6]
 #         if cycParams is None:
 #             cycParams = {'emit': 0.0, 'stencil': False}
-#     
+#
 #     nameVariant = ''
 #     if blockID in BLOCKVARIANTS:
 #         variants = BLOCKVARIANTS[blockID]
@@ -555,18 +546,18 @@ def mcToMTCoord(chunkPos, blockPos):
 #                         #mesh constructor...
 #     corename = "".join([corename, nameVariant])
 #     meshname = "".join(["mc", corename])
-# 
+#
 #     dupblock = blockbuild.construct(blockID, corename, colourtriple, mcfaceindices, extraBits, objectShape, shapeParams, cycParams)
 #     blockname = dupblock.name
 #     landmeshname = "".join(["mc", blockname.replace('Block', '')])
-# 
+#
 #     if landmeshname in bpy.data.meshes:
 #         return bpy.data.meshes[landmeshname]
-# 
+#
 #     landmesh = bpy.data.meshes.new(landmeshname)
 #     landob = bpy.data.objects.new(landmeshname, landmesh)
 #     bpy.context.scene.objects.link(landob)
-# 
+#
 #     global WORLD_ROOT	#Will have been inited by now. Parent the land to it. (a bit messy, but... meh)
 #     landob.parent = WORLD_ROOT
 #     dupblock.parent = landob
@@ -578,17 +569,17 @@ def mcToMTCoord(chunkPos, blockPos):
 #     """Creates the cloneable slime block (area marker) and a mesh to duplivert it."""
 #     if 'slimeChunks' in bpy.data.objects:
 #         return
-# 
+#
 #     #Create cube! (maybe give it silly eyes...)
 #     #ensure 3d cursor at 0...
-#     
+#
 #     bpy.ops.mesh.primitive_cube_add()
 #     slimeOb = bpy.context.object    #get ref to last created ob.
 #     slimeOb.name = 'slimeMarker'
 #     #Make it chunk-sized. It starts 2x2x2
 #     bpy.ops.transform.resize(value=(8, 8, 8))
 #     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-# 
+#
 #     # create material for the markers
 #     slimeMat = None
 #     smname = "mcSlimeMat"
@@ -604,7 +595,7 @@ def mcToMTCoord(chunkPos, blockPos):
 #         #slimeMat.use_shadeless = True	#traceable false!
 #         slimeMat.use_transparency = True
 #         slimeMat.alpha = .25
-# 
+#
 #     slimeOb.data.materials.append(slimeMat)
 #     slimeChunkmesh = bpy.data.meshes.new("slimeChunks")
 #     slimeChunkob = bpy.data.objects.new("slimeChunks", slimeChunkmesh)
@@ -613,8 +604,8 @@ def mcToMTCoord(chunkPos, blockPos):
 #     slimeChunkob.dupli_type = "VERTS"
 #     global WORLD_ROOT
 #     slimeChunkob.parent = WORLD_ROOT
-# 
-# 
+#
+#
 # def batchSlimeChunks(slimes):
 #     #Populate all slime marker centres into the dupli-geom from pydata.
 #     me = bpy.data.meshes["slimeChunks"]
@@ -731,7 +722,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
             print('nether LOAD!')
         else:
             print('Nether is present, but not chosen to load.')
-    
+
     if os.path.exists('DIM1'):
         if OPTIONS['loadend']:
             print('load The End...')
@@ -764,7 +755,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
         spY = worldData.value['Data'].value['SpawnY'].value
         spZ = worldData.value['Data'].value['SpawnZ'].value
         pPos = [float(spX), float(spY), float(spZ)]
-        
+
         #create empty markers for each player.
         #and: could it load multiplayer nether/end based on player loc?
 
@@ -803,7 +794,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
 #    bpy.context.scene.objects.link(WORLD_ROOT)
 #    WORLD_ROOT.empty_draw_size = 2.0
 #    WORLD_ROOT.empty_draw_type = 'SPHERE'
-    
+
     regionfiles = []
     regionreader = None
     if worldFormat == 'mcregion':
@@ -819,7 +810,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
 
     #except when loading nether...
     playerChunk = toChunkPos(pPos[0], pPos[2])  # x, z
-    
+
     print("Loading %d blocks around centre." % loadRadius)
     #loadRadius = 10 #Sane amount: 5 or 4.
 
@@ -836,10 +827,13 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
 
     #total chunk count across region files:
     REPORTING['totalchunks'] = 0
-    
-    pX = int(playerChunk[0])
-    pZ = int(playerChunk[1])
-    
+
+#     pX = int(playerChunk[0])
+#     pZ = int(playerChunk[1])
+    # ignore the player location, just load around origin
+    pX = 0
+    pZ = 0
+
     print('Loading a square halfwidth of %d chunks around load position, so creating chunks: %d,%d to %d,%d' % (loadRadius, pX-loadRadius, pZ-loadRadius, pX+loadRadius, pZ+loadRadius))
 
 #     if (OPTIONS['showslimes']):
@@ -855,14 +849,14 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
         for x in range(pX-loadRadius, pX+loadRadius):
 
             tChunk0 = datetime.datetime.now()
-            if (OPTIONS['surfaceOnly']): # new method
-                numElements=(loadRadius*2+1)*16 # chunks * blocks
-                blockBuffer = npy.zeros((numElements,numElements,numElements))
-
-                # FIXME - currently only supported by anvil reader
-                regionreader.readChunk2(x,z, blockBuffer, zeroAdjX, zeroAdjZ)
-            else: # old
-                regionreader.readChunk(x,z, meshBuffer) #may need to be further broken down to block level. maybe rename as loadChunk.
+#             if (OPTIONS['surfaceOnly']): # new method
+#                 numElements=(loadRadius*2+1)*16 # chunks * blocks
+#                 blockBuffer = npy.zeros((numElements,numElements,numElements))
+#
+#                 # FIXME - currently only supported by anvil reader
+#                 regionreader.readChunk2(x,z, blockBuffer, zeroAdjX, zeroAdjZ)
+#             else: # old
+            regionreader.readChunk(x,z, meshBuffer) #may need to be further broken down to block level. maybe rename as loadChunk.
             tChunk1 = datetime.datetime.now()
             chunkTime = tChunk1 - tChunk0
             tChunkReadTimes.append(chunkTime.total_seconds())	#tString = "%.2f seconds" % chunkTime.total_seconds() it's a float.
@@ -874,7 +868,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
 #                     slimeBuffer.append(slimeLoc)
 
     tBuild0 = datetime.datetime.now()
-    
+
 #    batchBuild(meshBuffer)
 #    if (OPTIONS['showslimes']):
 #        batchSlimeChunks(slimeBuffer)
@@ -886,7 +880,7 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
     if len(unknownBlockIDs) > 0:
         print("Unknown new Minecraft datablock IDs encountered:")
         print(" ".join(["%d" % bn for bn in unknownBlockIDs]))
-    
+
     #Viewport performance hides:
 #     if (OPTIONS['fasterViewport']):
 #         hideIfPresent('mcStone')
@@ -902,10 +896,13 @@ def readMinecraftWorld(worldFolder, loadRadius, toggleOptions):
     chunkReadTotal = tChunkReadTimes[0]
     for tdiff in tChunkReadTimes[1:]:
         chunkReadTotal = chunkReadTotal + tdiff
-    print("Total chunk reads time: %.2fs" % chunkReadTotal)  #I presume that's in seconds, ofc... hm.
+    print("Total read time: %.2fs" % chunkReadTotal)  #I presume that's in seconds, ofc... hm.
     chunkMRT = chunkReadTotal / len(tChunkReadTimes)
     print("Mean chunk read time: %.2fs" % chunkMRT)
     print("Block points processed: %d" % REPORTING['blocksread'])
+    blockMRT = REPORTING['blocksread'] / chunkReadTotal
+    print("Blocks read/second: %.2fs" % blockMRT)
+
 #    print("of those, verts dumped: %d" % REPORTING['blocksdropped'])
 #    if REPORTING['blocksread'] > 0:
 #        print("Difference (expected vertex count): %d" % (REPORTING['blocksread'] - REPORTING['blocksdropped']))

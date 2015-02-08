@@ -216,32 +216,32 @@ def findConversion(blockid, blockdata, mods):
 		return (cnv[2], 0)
 	return None
 
-def perform(level, box, options):
-	try:
-		f = open("../" + options["Output filename"] + ".we", 'w')
-	except:
-		raise
-
-	origin = (
-		box.minx + int((box.maxx - box.minx) / 2),
-		box.miny + int((box.maxy - box.miny) / 2),
-		box.minz + int((box.maxz - box.minz) / 2),
-	)
-	
-	mods = {}
-	for arg in options.keys():
-		if options[arg] == "True":
-			mods[arg.lower()] = True
-	
-	for x in xrange(box.minx, box.maxx):
-		for z in xrange(box.minz, box.maxz):
-			for y in xrange(box.miny, box.maxy):
-				c = findConversion(level.blockAt(x, y, z), level.blockDataAt(x, y, z), mods)
-				if c == None:
-					continue
-				calcpos = (x - origin[0], y - origin[1], z - origin[2])
-				fmttpl = calcpos + (c[0], level.blockLightAt(x, y, z), c[1])
-				f.write("%d %d %d %s %d %d\n" % fmttpl)
-
-	f.close()
+# def perform(level, box, options):
+# 	try:
+# 		f = open("../" + options["Output filename"] + ".we", 'w')
+# 	except:
+# 		raise
+# 
+# 	origin = (
+# 		box.minx + int((box.maxx - box.minx) / 2),
+# 		box.miny + int((box.maxy - box.miny) / 2),
+# 		box.minz + int((box.maxz - box.minz) / 2),
+# 	)
+# 	
+# 	mods = {}
+# 	for arg in options.keys():
+# 		if options[arg] == "True":
+# 			mods[arg.lower()] = True
+# 	
+# 	for x in xrange(box.minx, box.maxx):
+# 		for z in xrange(box.minz, box.maxz):
+# 			for y in xrange(box.miny, box.maxy):
+# 				c = findConversion(level.blockAt(x, y, z), level.blockDataAt(x, y, z), mods)
+# 				if c == None:
+# 					continue
+# 				calcpos = (x - origin[0], y - origin[1], z - origin[2])
+# 				fmttpl = calcpos + (c[0], level.blockLightAt(x, y, z), c[1])
+# 				f.write("%d %d %d %s %d %d\n" % fmttpl)
+# 
+# 	f.close()
 

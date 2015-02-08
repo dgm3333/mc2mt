@@ -3,10 +3,214 @@ import os
 
 from struct import unpack   #, error as StructError
 import nbtreader, mcregionreader
+import blockconversion
 from mineregion import OPTIONS, EXCLUDED_BLOCKS, BLOCKDATA, REPORTING, unknownBlockIDs, WORLD_ROOT
 ##..yuck: they're immutable and don't return properly except for the dict-type ones. Get rid of this in next cleanup.
 
 from math import floor
+
+MC2MTdict2 = {
+    #blockdata -1 means ignore
+    #blockdata -2 means copy without change
+    #blockdata -3 means copy and convert the mc facedir value to mt facedir
+    #blockdata -4 is for stairs to support upside down ones
+
+#   ID.dat   Minecraft Name       MC ID#  blockdata   minetest-nodename
+    0    :['Air',                     0,      -1,      'default:air','',                                                        ''],
+    1    :['Stone',                 1,         -1,      'default:stone',                                                        ''],
+    2    :['Grass',                 2,         -1,      'default:dirt_with_grass',                                                        ''],
+    3    :['Dirt',                  3,         -1,      'default:dirt',                                                        ''],
+    4    :['Cobblestone',             4,         -1,      'default:cobble',                                                        ''],
+    5    :['WoodenPlank',             5,          3,      'default:junglewood',                                                        ''],
+    5    :['WoodenPlank',             5,         -1,      'default:wood',                                                        ''],
+    6    :['Sapling',                 6,          3,      'default:junglesapling',                                                        ''],
+    6    :['Sapling',                 6,         -1,      'default:sapling',                                                        ''],
+    7    :['Bedrock',                 7,         -1,      'default:stone',                                                        ''],
+    8    :['WaterFlo',              8,         -1,      'default:water_flowing',                                                        ''],
+    9    :['Water',                 9,         -1,      'default:water_source',                                                        ''],
+    10    :['LavaFlo',                 10,     -1,      'default:lava_flowing',                                                        ''],
+    11    :['Lava',                  11,     -1,      'default:lava_source',                                                        ''],
+    12    :['Sand',                  12,     -1,      'default:sand',                                                        ''],
+    13    :['Gravel',                 13,     -1,      'default:gravel',                                                        ''],
+    14    :['GoldOre',                 14,     -1,      'default:stone_with_gold',                                                        ''],
+    15    :['IronOre',                 15,     -1,      'default:stone_with_iron',                                                        ''],
+    16    :['CoalOre',                 16,     -1,      'default:stone_with_coal',                                                        ''],
+    17    :['Wood',                  17,      3,      'default:jungletree',                                                        ''],
+    17    :['Wood',                  17,     -1,      'default:tree',                                                        ''],
+    18    :['Leaves',                 18,      3,      'default:jungleleaves',                                                        ''],
+    18    :['Leaves',                 18,      3,      'default:jungleleaves',                                                        ''],
+    18    :['Leaves',                 18,     -1,      'default:leaves',                                                        ''],
+    19    :['Sponge',                 19,      0,      '??',                                                        ''],
+    20    :['Glass',                 20,     -1,      'default:glass',                                                        ''],
+    21    :['LapisLazuliOre',         21,     -1,      'default:stone_with_copper',                                ''],
+    22    :['LapisLazuliBlock',      22,     -1,      'default:copperblock',                                    ''],
+    23    :['Dispenser',             23,      0,      '??',                                                        ''],
+    24    :['Sandstone',             24,      1,      'default:sandstonebrick',                                    ''],
+    24    :['Sandstone',             24,     -1,      'default:sandstone',                                        ''],
+    25    :['NoteBlock',             25,     -1,      'mesecons_noteblock:noteblock',                  'mesecons'],
+    26    :['Bed',                    26,      0,      '??',                                                        ''],
+    27    :['PwrRail',                 27,      0,      '??',                                                        ''],
+    28    :['DetRail',                 28,      0,      '??',                                                        ''],
+    29    :['StickyPiston',          29,     -3,      'mesecons_pistons:piston_sticky_off',      'mesecons'],
+    30    :['Cobweb',                 30,      0,      '??',                                                        ''],
+    31    :['TallGrass',             31,      0,      'default:dry_shrub',                                                        ''],
+    31    :['TallGrass',             31,      1,      'default:grass_4',                                                        ''],
+    31    :['TallGrass',             31,      2,      'default:grass_3',                                                        ''],
+    31    :['TallGrass',             31,     -1,      'default:grass_1',                                                        ''],
+    32    :['DeadBush',              32,     -1,      'default:dry_shrub',                                                        ''],
+    33    :['Piston',                 33,     -3,      'mesecons_pistons:piston_normal_off',      'mesecons'],
+    34    :['PistonHead',             34,       0,      '??',                                                        ''],
+    35    :['Wool',                  35,      0,      'wool:white',                                                        ''],
+    35    :['Wool',                  35,      1,      'wool:orange',                                                        ''],
+    35    :['Wool',                  35,      4,      'wool:yellow',                                                        ''],
+    35    :['Wool',                  35,      5,      'wool:green',                                                        ''],
+    35    :['Wool',                  35,      6,      'wool:pink',                                                        ''],
+    35    :['Wool',                  35,      7,      'wool:dark_grey',                                                        ''],
+    35    :['Wool',                  35,      8,      'wool:grey',                                                        ''],
+    35    :['Wool',                  35,      9,      'wool:cyan',                                                        ''],
+    35    :['Wool',                  35,     10,      'wool:violet',                                                        ''],
+    35    :['Wool',                  35,     11,      'wool:blue',                                                        ''],
+    35    :['Wool',                  35,     12,      'wool:brown',                                                        ''],
+    35    :['Wool',                  35,     13,      'wool:dark_green',                                                        ''],
+    35    :['Wool',                  35,     14,      'wool:red',                                                        ''],
+    35    :['Wool',                  35,     15,      'wool:black',                                                        ''],
+    36    :['??',                    36,      0,      '??',                                                        ''],
+    37    :['Dandelion',             37,     -1,      'flowers:dandelion_yellow',                                                        ''],
+    38    :['Rose',                  38,     -1,      'flowers:rose',                                                        ''],
+    39    :['BrownMushrm',             39,     -1,      'riesenpilz:brown',      'riesenpilz'],
+    40    :['RedMushrm',             40,     -1,      'riesenpilz:red',      'riesenpilz'],
+    41    :['GoldBlock',             41,     -1,      'default:goldblock',                                                        ''],
+    42    :['IronBlock',             42,     -1,      'default:steelblock',                                                        ''],
+    43    :['DblSlabs',              43,      1,      'default:sandstone',                                                        ''],
+    43    :['DblSlabs',              43,      2,      'default:wood',                                                        ''],
+    43    :['DblSlabs',              43,      3,      'default:cobble',                                                        ''],
+    43    :['DblSlabs',              43,      4,      'default:brick',                                                        ''],
+    43    :['DblSlabs',              43,      5,      'default:stonebrick',                                                        ''],
+    43    :['DblSlabs',              43,      6,      'nether:brick',      'nether'],
+    44    :['Slabs',                 44,      0,      'stairs:slab_stone',                                                        ''],
+    44    :['Slabs',                 44,      1,      'stairs:slab_sandstone',                                                        ''],
+    44    :['Slabs',                 44,      2,      'stairs:slab_wood',                                                        ''],
+    44    :['Slabs',                 44,      3,      'stairs:slab_cobble',                                                        ''],
+    44    :['Slabs',                 44,      4,      'stairs:slab_brick',                                                        ''],
+    44    :['Slabs',                 44,      5,      'stairs:slab_stonebrick',                                                        ''],
+    44    :['Slabs',                 44,      8,      'stairs:slab_stoneupside_down',                                                        ''],
+    44    :['Slabs',                 44,      9,      'stairs:slab_sandstoneupside_down',                                                        ''],
+    44    :['Slabs',                 44,     10,      'stairs:slab_woodupside_down',                                                        ''],
+    44    :['Slabs',                 44,     11,      'stairs:slab_cobbleupside_down',                                                        ''],
+    44    :['Slabs',                 44,     12,      'stairs:slab_brickupside_down',                                                        ''],
+    44    :['Slabs',                 44,     13,      'stairs:slab_stonebrickupside_down',                                                        ''],
+    45    :['BrickBlock',             45,     -1,      'default:brick',                                                        ''],
+    46    :['TNT',                   46,      0,      '??',                                                        ''],
+    47    :['Bookshelf',             47,     -1,      'default:bookshelf',                                                        ''],
+    48    :['MossStone',             48,     -1,      'default:mossycobble',                                                        ''],
+    49    :['Obsidian',              49,     -1,      'default:obsidian',                                                        ''],
+    50    :['Torch',                 50,     -3,      'default:torch',                                                        ''],
+    51    :['Fire',                  51,     -1,      'fire:basic_flame',                                                        ''],
+    52    :['MonsterSpawner',         52,      0,      '??',                                                        ''],
+    53    :['WoodenStairs',          53,     -4,      'stairs:stair_wood',                                                        ''],
+    54    :['Chest',                 54,     -1,      'default:chest',                                                        ''],
+    55    :['RedStnWire',             55,     -1,      'mesecons:wire_00000000_off',      'mesecons'],
+    56    :['DiamondOre',             56,     -1,      'default:stone_with_diamond',                                                        ''],
+    57    :['DiamondBlock',          57,     -1,      'default:diamondblock',                                                        ''],
+    58    :['CraftingTbl',             58,      0,      '??',                                                        ''],
+    59    :['Seeds',                 59,      0,      '??',                                                        ''],
+    60    :['Farmland',              60,      0,      '??',                                                        ''],
+    61    :['Furnace',                 61,     -1,      'default:furnace',                                                        ''],
+    62    :['Burnace',                 62,     -1,      'default:furnace_active',                                                        ''],
+    63    :['SignPost',              63,     -1,      'default:sign_wood',                                                        ''],
+    64    :['WoodDoor',              64,     -1,      'doors:door_wood_t_1',                                                        ''],
+    65    :['Ladder',                 65,     -1,      'default:ladder',                                                        ''],
+    66    :['Rail',                  66,     -1,      'default:rail',                                                        ''],
+    67    :['CobbleStairs',          67,     -4,      'stairs:stair_cobble',                                                        ''],
+    68    :['WallSign',              68,     -3,      'default:sign_wood',                                                        ''],
+    69    :['Lever',                 69,     -3,      'mesecons_walllever:wall_lever_off',              'mesecons'],
+    70    :['StnPressPlate',         70,     -1,      'mesecons_pressureplates:pressure_plate_stone_off', 'mesecons'],
+    71    :['IronDoor',              71,     -1,      'doors:door_steel_t_1',                                    ''],
+    72    :['WdnPressPlate',         72,     -1,      'mesecons_pressureplates:pressure_plate_wood_off',  'mesecons'],
+    73    :['RedstOre',              73,     -1,      'default:stone_with_mese',                         'mesecons'],
+    74    :['RedstOreGlowing',         74,     -1,      'default:stone_with_mese',                        'mesecons'],
+    75    :['RedstTorchOff',         75,     -3,      'mesecons_torch:torch_off',                     'mesecons'],
+    76    :['RedstTorchOn',          76,     -3,      'mesecons_torch:torch_on',                      'mesecons'],
+    77    :['StoneButton',             77,     -3,      'mesecons_button:button_off',                    'mesecons'],
+    78    :['Snow',                  78,     -1,      'default:snow',                                            ''],
+    79    :['Ice',                   79,     -1,      'default:ice',                                            ''],
+    80    :['SnowBlock',             80,     -1,      'default:snowblock',                                        ''],
+    81    :['Cactus',                 81,     -1,      'default:cactus',                                            ''],
+    82    :['ClayBlock',             82,     -1,      'default:clay',                                            ''],
+    83    :['SugarCane',             83,     -1,      'default:papyrus',                                        ''],
+    84    :['Jukebox',                 84,      0,      '??',                                                        ''],
+    85    :['Fence',                 85,     -1,      'default:fence_wood',                                        ''],
+    86    :['Pumpkin',                 86,      0,      '??',                                                        ''],
+    87    :['Netherrack',             87,     -1,      'nether:rack',                                        'nether'],
+    88    :['SoulSand',              88,     -1,      'nether:sand',                                         'nether'],
+    89    :['Glowstone',             89,     -1,      'nether:glowstone',                                    'nether'],
+    90    :['Portal',                 90,     -3,      'nether:portal',                                     'nether'],
+    91    :['JackOLantern',          91,      0,      '??',                                                        ''],
+    92    :['Cake',                  92,      0,      '??',                                                        ''],
+    93    :['RedRepOff',             93,     -3,      'mesecons_delayer:delayer_off_1',                  'mesecons'],
+    94    :['RedRepOn',              94,     -3,      'mesecons_delayer:delayer_on_1',                   'mesecons'],
+#    095':['LockedChest',         95,      0,      '??',                                                        ''],
+#     blocks are non-textured and opaque... unanticipated state?,                 ,                 ,                 ,
+    95    :['StainedGlass',          95,      0,      '??',                                                        ''],
+    96    :['Trapdoor',              96,      0,      '??',                                                        ''],
+    97    :['HiddenSfish',             97,      0,      '??',                                                        ''],
+    98    :['StoneBricks',             98,     -1,      'default:stonebrick',                                        ''],
+    99    :['HgRedM',                 99,     -3,      'riesenpilz:head_brown',                         'riesenpilz'],
+    100    :['HgBrwM',                 100,     -3,      'riesenpilz:head_brown',                        'riesenpilz'],
+    101    :['IronBars',              101,      0,      '??',                                                        ''],
+    102    :['GlassPane',             102,      0,      '??',                                                        ''],
+    103    :['Melon',                 103,      0,      '??',                                                        ''],
+    104    :['PumpkinStem',            104,      0,      '??',                                                        ''],
+    105    :['MelonStem',             105,      0,      '??',                                                        ''],
+    106    :['Vines',                 106,      0,      '??',                                                        ''],
+    107    :['FenceGate',             107,      0,      '??',                                                        ''],
+    108    :['BrickStairs',             108,     -4,      'stairs:stair_brick',                                        ''],
+    109    :['StoneBrickStairs',      109,     -3,      'stairs:stair_stonebrick',                                ''],
+    110    :['Mycelium',              110,      0,      '??',                                                        ''],
+    111    :['LilyPad',                 111,      0,      '??',                                                        ''],
+    112    :['NethrBrick',             112,      0,      '??',                                                        ''],
+    113    :['NethrBrickFence',         113,      0,      '??',                                                        ''],
+    114    :['NethrBrickStairs',      114,      0,      '??',                                                        ''],
+    115    :['NethrWart',             115,      0,      '??',                                                        ''],
+    116    :['EnchantTab',             116,      0,      '??',                                                        ''],
+    117    :['BrewStnd',              117,      0,      '??',                                                        ''],
+    118    :['Cauldron',              118,      0,      '??',                                                        ''],
+    119    :['EndPortal',             119,      0,      '??',                                                        ''],
+    120    :['EndPortalFrame',         120,      0,      '??',                                                        ''],
+    121    :['EndStone',              121,      0,      '??',                                                        ''],
+    122    :['DragonEgg',             122,      0,      '??',                                                        ''],
+    123    :['RedstLampOff',          123,     -1,      'mesecons_lightstone_red_off',                     'mesecons'],
+    124    :['RedstLampOn',             124,     -1,      'mesecons_lightstone_red_on',                   'mesecons'],
+    125    :['??',                    125,      3,      'default:junglewood',                                        ''],
+    125    :['??',                    125,     -1,      'default:wood',                                            ''],
+    126    :['??',                    126,      3,      'stairs:slab_junglewood',                                    ''],
+    126    :['??',                    126,     -1,      'stairs:slab_wood',                                        ''],
+    127    :['??',                    127,      0,      '??',                                                        ''],
+    128    :['??',                    128,     -4,      'stairs:stair_sandstone',                                    ''],
+    129    :['EmeraldOre',             129,     -1,      'default:stone_with_mese',                                ''],
+    130    :['??',                    130,      0,      '??',                                                        ''],
+    131    :['??',                    131,      0,      '??',                                                        ''],
+    132    :['??',                    132,      0,      '??',                                                        ''],
+    133    :['EmeraldBlock',          133,     -1,      'default:mese',                                            ''],
+    134    :['??',                    134,     -4,      'stairs:stair_wood',                                         ''],
+    135    :['??',                    135,     -4,      'stairs:stair_wood',                                        ''],
+    136    :['??',                    136,     -4,      'stairs:stair_junglewood',                                ''],
+    137    :['??',                    137,     -1,      'mesecons_commandblock:commandblock_off',          'mesecons'],
+    138    :['Beacon',                 138,      0,      '??',                                                        ''],
+    151    :['??',                    151,     -1,      'mesecons_solarpanel:solar_panel_off',           'mesecons'],
+    152    :['Redstone',              152,     -1,      'default:mese',                                   'mesecons'],
+    153    :['NetherQuartzOre',         153,      0,      '??',                                                        ''],
+    155    :['Quartz',                 155,      0,      '??',                                                        ''],
+    159    :['StainedClay',             159,      0,      '??',                                                        ''],
+    162    :['Acacia',                 162,      0,      '??',                                                        ''],
+    168    :['Prismarine',             168,      0,      '??',                                                        ''],
+    169    :['SeaLantern',             169,      0,      '??',                                                        ''],
+    170    :['HayBale',                 170,      0,      '??',                                                        ''],
+    172    :['HardenedClay',          172,      0,      '??',                                                        ''],
+    173    :['BlockOfCoal',             173,      0,      '??',                                                        ''],
+    174    :['PackedIce',             174,      0,      '??',                                                        ''],
+    179    :['RedSandstone',          179,      0,      '??',                                                     '']
+}
 
 class AnvilChunkReader(mcregionreader.ChunkReader):
 
@@ -55,7 +259,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
 
 
 
-    
+
     def readChunk2(self, chunkPosX, chunkPosZ, blockBuffer, zeroAdjX, zeroAdjY):
         # FIXME - implement me!
         return
@@ -87,7 +291,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
             cheadr = regfile.read(4)
             dataoffset = unpack(">i", b'\x00'+cheadr[0:3])[0]
             chunksectorcount = cheadr[3]
-            
+
             if dataoffset == 0 and chunksectorcount == 0:
                 pass
                 #print("Region exists, but chunk has never been created within it.")
@@ -167,11 +371,11 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
 
         if blockID == 18:   #leaves   #and glass? and other exemptions?
             return True
-        
+
         if dX == 0 or dX == 15 or dY == 0 or dZ == 0 or dZ == 15:
             #get neighbour directly
             return True	#instead, check neigbouring chunks...
-        
+
 
         #we can no longer get the block below or above easily as we might be iterating +x, -16x, or +z at any given step.
         if dY == skyHighLimit or dY == depthLimit:
@@ -213,7 +417,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
             dnBlock = secBlockData[downIndex]
             if dnBlock != blockID:
                 return True
-        
+
         #Have checked above and below; now check all sides. Same section, but maybe different chunks...
         #Check X-1 (leftward)
         leftIndex = (yBoff * 16 + dZ) * 16 + (dX-1)
@@ -258,7 +462,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
         #TileEntities are needed for some things to define fully...
 
         #TODO: Keep an 'adjacent chunk cache' for neighbourhood is-exposed checks.
-        
+
         global unknownBlockIDs, OPTIONS, REPORTING
 
         #chunkLocation = 'xPos' 'zPos' ...
@@ -267,7 +471,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
         biomes = chunkLevelData['Biomes'].value    #yields a TAG_Byte_Array value (bytes object) of len 256 (16x16)
         #heightmap = chunkLevelData['HeightMap'].value
         #'TileEntities' -- surely need this for piston data and stuff, no?
-        
+
         entities = chunkLevelData['Entities'].value    # load ze sheeps!! # a list of tag-compounds.
         #omitmobs = OPTIONS['omitmobs']
         if not OPTIONS['omitmobs']:
@@ -283,29 +487,29 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
         ##_Y_SHIFT = 7    # 2**7 is 128. use for fast multiply
         ##_YZ_SHIFT = 11    #16 * 128 is 2048, which is 2**11
         sections = chunkLevelData['Sections'].value
-        
+
         #each section is a 16x16x16 piece of chunk, with a Y-byte from 0-15, so that the 'y' value is 16*that + in-section-Y-value
-        
+
         #iterate through all block Y values from bedrock to max height (minor step through X,Z.)
         #bearing in mind some can be skipped out.
-        
+
         #sectionDict => a dictionary of sections, indexed by Y.
         sDict = {}
         for section in sections:
             sY = section.value['Y'].value
             sDict[sY] = section.value
-        
+
         for section in sections:
             sec = section.value
             secY = sec['Y'].value * SECTNSIZE_Y
-            
+
             #if (secY + 16) < lowlimit, skip this section. no need to load it.
             if (secY+16 < depthLimit):
                 continue
-            
+
             if (secY > skyHighLimit):
                 return
-            
+
             #Now actually proceed with adding in the section's block data.
             blockData = sec['Blocks'].value    #yields a TAG_Byte_Array value (bytes object). Blocks is 16x16 bytes
             extraData = sec['Data'].value      #BlockLight, Data and SkyLight are 16x16 "4-bit cell" additional data arrays.
@@ -319,7 +523,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
             #go y 0 to 16...
             for sy in range(16):
                 dY = secY + sy
-                
+
                 if dY < depthLimit:
                     continue
                 if dY > skyHighLimit:
@@ -384,7 +588,7 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
         global WORLD_ROOT
         for e in entities:
             eData = e.value
-            
+
             etypename = eData['id'].value   #eg 'Sheep'
             ename = "en%sMarker" % etypename
             epos = [p.value for p in eData['Pos'].value]   #list[3] of double
@@ -398,36 +602,36 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
             entMarker.location[0] = -epos[2]
             entMarker.location[1] = -epos[0]
             entMarker.location[2] = epos[1]
-            
+
             #also, set its z-rotation to erot[0]...
             #entMarker.rotation[2] = erot[0]
-            
+
             bpy.context.scene.objects.link(entMarker)
             entMarker.parent = WORLD_ROOT
-            
-        
-        
+
+
+
 ##NB! Future blocks will require the Add tag to be checked and mixed in!
-#Each section also has a "Add" tag, which is a DataLayer byte array just like 
-#"Data". The "Add" tag is not included in the converter since the old format 
-#never had block ids above 255. This extra tag is created whenever a block 
-#requires it, so the getTile() method needs to check if the array exists and 
-#then combine it with the default block data. In other words, 
+#Each section also has a "Add" tag, which is a DataLayer byte array just like
+#"Data". The "Add" tag is not included in the converter since the old format
+#never had block ids above 255. This extra tag is created whenever a block
+#requires it, so the getTile() method needs to check if the array exists and
+#then combine it with the default block data. In other words,
 #blockId = (add << 8) + baseId.
 
         # Blocks, Data, Skylight, ... heightmap
         #Blocks contain the block ids; Data contains the extra info: 4 bits of lighting info + 4 bits of 'extra fields'
         # eg Lamp direction, crop wetness, etc.
         # Heightmap gives us quick access to the top surface of everything - ie optimise out iterating through all sky blocks.
-        
+
         #To access a specific block from either the block or data array from XYZ coordinates, use the following formula:
-        # Index = x + (y * Height + z) * Width 
+        # Index = x + (y * Height + z) * Width
 
         ##Note that the old format is XZY ((x * 16 + z) * 16 + y) and the new format is YZX ((y * 16 + z) * 16 + x)
 
         #16x16 (256) ints of heightmap data. Each int records the lowest level
         #in each column where the light from the sky is at full strength. Speeds up
-        #computing of the SkyLight. Note: This array's indexes are ordered Z,X 
+        #computing of the SkyLight. Note: This array's indexes are ordered Z,X
         #whereas the other array indexes are ordered X,Z,Y.
 
         #loadedData -> we buffer everything into lists, then batch-create the
@@ -438,13 +642,13 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
         #Aggressive optimisation: only load if there is 1 air orthogonal neighbour (or transparent materials).
 
 
-            
+
 
 
 #    def mcToBlendCoord(chunkPos, blockPos):
 #        """Converts a minecraft chunk X,Z pair and a minecraft ordered X,Y,Z block location triple into a Blender coordinate vector Vx,Vy,Vz.
 #    And remember: in Minecraft, Y points to the sky."""
-        
+
         # Mapping Minecraft coords -> Blender coords
         # In Minecraft, +Z (west) <--- 0 ----> -Z (east), while North is -X and South is +X
         # In Blender, north is +Y, south is-Y, west is -X and east is +X.
@@ -453,28 +657,39 @@ class AnvilChunkReader(mcregionreader.ChunkReader):
 #        vx = -(chunkPos[1] << 4) - blockPos[2]
 #        vy = -(chunkPos[0] << 4) - blockPos[0]   # -x of chunkpos and -x of blockPos (x,y,z)
 #        vz = blockPos[1]    #Minecraft's Y.
-        
-#        return Vector((vx,vy,vz))
 
+#        return Vector((vx,vy,vz))
 
     def createBlock(blockID, chunkPos, blockPos, extraBlockData, vertBuffer):
         """adds a vertex to the blockmesh for blockID in the relevant location."""
-        print("AnvilChunkReader.createBlock")
-        print("blockID: " + str(blockID))
-        print("chunkPos: " + str(chunkPos))
-        print("blockPos: " + str(blockPos))
-        print("extraBlockData: " + str(extraBlockData))
-        print("")
+        MTBlockKey = blockID
+        print("AnvilChunkReader.createBlock:" + " chunkPos:" + str(chunkPos) + " blockPos:" + str(blockPos) + " blockID:" + str(blockID) 
+            + " extraBlockData:" + str(extraBlockData) + " MTBlockKey:" + str(MTBlockKey) + " MTblock:" + MC2MTdict2[MTBlockKey][0] + " --> "+ MC2MTdict2[MTBlockKey][3])
+
+
+#         print("AnvilChunkReader.createBlock")
+#         print("blockID: " + str(blockID))
+#         print("chunkPos: " + str(chunkPos))
+#         print("blockPos: " + str(blockPos))
+#         print("extraBlockData: " + str(extraBlockData))
+# 
+# #        MTBlockKey = str('00'+str(blockID))[-3:]+'.'+str(100+extraBlockData)[-2:]
+#         MTBlockKey = blockID
+#         print("MTBlockKey: " + str(MTBlockKey))
+# 
+#         print("MTblock: " + MC2MTdict2[MTBlockKey][0] + " --> "+ MC2MTdict2[MTBlockKey][3])
+# 
+#         print("")
 #        print("vertBuffer: " + str(vertBuffer))
 
 #         chunkpos is X,Z; blockpos is x,y,z for block.
 #         mesh = getMCBlockType(blockID, extraBlockData)  #this could be inefficient. Perhaps create all the types at the start, then STOP MAKING THIS CHECK!
 #         if mesh is None:
 #             return
-# 
+#
 #         typeName = mesh.name
 #         vertex = mcToBlendCoord(chunkPos, blockPos)
-# 
+#
 #         if typeName in vertBuffer:
 #             vertBuffer[typeName].append(vertex)
 #         else:
